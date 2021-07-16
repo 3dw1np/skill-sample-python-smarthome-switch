@@ -16,6 +16,7 @@ Create a new AWS Lambda function that will handle the Smart Home directives from
 	            "Effect": "Allow",
 	            "Action": [
 	                "logs:CreateLogStream",
+	                "dynamodb:GetItem",
 	                "dynamodb:UpdateItem",
 	                "logs:CreateLogGroup",
 	                "logs:PutLogEvents"

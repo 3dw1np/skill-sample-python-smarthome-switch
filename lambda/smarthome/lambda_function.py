@@ -66,11 +66,13 @@ def lambda_handler(request, context):
             capability_alexa = adr.create_payload_endpoint_capability()
             capability_alexa_powercontroller = adr.create_payload_endpoint_capability(
                 interface='Alexa.PowerController',
-                supported=[{'name': 'powerState'}])
+                supported=[{'name': 'powerState'}],
+                retrievable=True)
             adr.add_payload_endpoint(
                 friendly_name='Sample Switch',
                 endpoint_id='sample-switch-01',
-                capabilities=[capability_alexa, capability_alexa_powercontroller])
+                capabilities=[capability_alexa, capability_alexa_powercontroller],
+                display_categories=['SWITCH'])
             return send_response(adr.get())
 
     if namespace == 'Alexa.PowerController':
@@ -90,6 +92,18 @@ def lambda_handler(request, context):
         apcr.add_context_property(namespace='Alexa.PowerController', name='powerState', value=power_state_value)
         return send_response(apcr.get())
 
+    if namespace == 'Alexa':
+        if name == 'ReportState':
+            endpoint_id = request['directive']['endpoint']['endpointId']
+            power_state_value = get_device_state(endpoint_id=endpoint_id, state='powerState')
+            correlation_token = request['directive']['header']['correlationToken']
+
+            arsr = AlexaResponse(namespace='Alexa', name='StateReport', correlation_token=correlation_token)
+            arsr.add_context_property(
+                namespace='Alexa.PowerController',
+                name='powerState',
+                value=power_state_value)
+            return send_response(arsr.get())
 
 def send_response(response):
     # TODO Validate the response
@@ -104,8 +118,21 @@ def set_device_state(endpoint_id, state, value):
         TableName='SampleSmartHome',
         Key={'ItemId': {'S': endpoint_id}},
         AttributeUpdates={attribute_key: {'Action': 'PUT', 'Value': {'S': value}}})
+    print('dynamodbdb response -----')
     print(response)
     if response['ResponseMetadata']['HTTPStatusCode'] == 200:
         return True
     else:
         return False
+
+def get_device_state(endpoint_id, state):
+    attribute_key = state + 'Value'
+    response = aws_dynamodb.get_item(
+        TableName='SampleSmartHome',
+        Key={'ItemId': {'S': endpoint_id}})
+    print('dynamodbdb response -----')
+    print(response)
+    if response['ResponseMetadata']['HTTPStatusCode'] == 200:
+        return response['Item'][attribute_key]['S']
+    else:
+        return Exception('Item not found')
